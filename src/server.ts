@@ -217,12 +217,14 @@ export function createApp(deps: Deps) {
   })
   app.get('/api/v1/runs', (c) => { const u = api(c); if (!u) return c.json({ error: 'unauthorized' }, 401); return c.json({ runs: store.runsOf(u.id) }) })
   app.get('/api/v1/runs/:id', (c) => { const u = api(c); if (!u) return c.json({ error: 'unauthorized' }, 401); const run = store.run(c.req.param('id') ?? ''); if (!run || run.userId !== u.id) return c.json({ error: 'not found' }, 404); return c.json({ run, findings: store.findings(run.id) }) })
-  app.get('/api/v1/runs/:id/export.:fmt{(json|csv)}', (c) => {
+  const exportRun = (c: Context, fmt: 'json' | 'csv') => {
     const u = api(c); if (!u) return c.json({ error: 'unauthorized' }, 401)
     const run = store.run(c.req.param('id') ?? ''); if (!run || run.userId !== u.id) return c.json({ error: 'not found' }, 404)
-    const { body, type } = service.exportFindings(run, c.req.param('fmt') as 'json' | 'csv')
-    return c.body(body, 200, { 'content-type': `${type}; charset=utf-8`, 'content-disposition': `attachment; filename="autohacker-${run.host}-${run.id}.${c.req.param('fmt')}"` })
-  })
+    const { body, type } = service.exportFindings(run, fmt)
+    return c.body(body, 200, { 'content-type': `${type}; charset=utf-8`, 'content-disposition': `attachment; filename="autohacker-${run.host}-${run.id}.${fmt}"` })
+  }
+  app.get('/api/v1/runs/:id/export.json', (c) => exportRun(c, 'json'))
+  app.get('/api/v1/runs/:id/export.csv', (c) => exportRun(c, 'csv'))
   app.get('/api/v1/stats', (c) => c.json({ ...store.stats(), version: VERSION }))
 
   app.post('/hooks/coinpay', async (c) => {
