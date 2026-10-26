@@ -1,0 +1,15 @@
+#!/bin/bash
+# Forced command for the auto.hacker CI deploy key (root authorized_keys, restrict).
+# Accepts one argument: a 40-hex commit already on origin/main. Checks it out in
+# /opt/auto.hacker and runs bin/install.sh. Nothing else is possible with that key.
+# Installed at /usr/local/bin/auto-hacker-deploy on dev2.
+set -euo pipefail
+sha="${SSH_ORIGINAL_COMMAND:-}"
+sha="${sha##* }"
+[[ "$sha" =~ ^[0-9a-f]{40}$ ]] || { echo "auto-hacker-deploy: expected a 40-hex sha" >&2; exit 2; }
+cd /opt/auto.hacker
+git fetch -q origin main
+git merge-base --is-ancestor "$sha" origin/main || { echo "auto-hacker-deploy: $sha is not on origin/main" >&2; exit 3; }
+git checkout -q main && git merge -q --ff-only "$sha"
+echo "auto-hacker-deploy: at $(git log --oneline -1)"
+exec ./bin/install.sh

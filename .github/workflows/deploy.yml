@@ -1,0 +1,31 @@
+# Ship every merge to dev2, where auto.hacker runs as root from /opt/auto.hacker.
+# AH_DEPLOY_KEY is a root key restricted on dev2 to one forced command,
+# /usr/local/bin/auto-hacker-deploy (deploy/auto-hacker-deploy), which takes a commit
+# already on origin/main, fast-forwards the checkout and runs bin/install.sh.
+name: Deploy to dev2
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+concurrency:
+  group: deploy-dev2-auto-hacker
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Set up ssh
+        env:
+          SSH_KEY: ${{ secrets.AH_DEPLOY_KEY }}
+          KNOWN_HOSTS: ${{ secrets.AH_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+      - name: Deploy
+        env:
+          SHA: ${{ github.sha }}
+        run: ssh -o BatchMode=yes -o IdentitiesOnly=yes -i ~/.ssh/id_ed25519 root@dev2.profullstack.com "deploy $SHA"

@@ -1,0 +1,6 @@
+#!/usr/bin/env bun
+/** autohacker launcher: route subcommands to the CLI, the MCP server or the TUI. */
+const [sub] = process.argv.slice(2)
+if (sub === 'mcp') { await import('../src/mcp.ts').then((m) => m.runMcp()) }
+else if (sub === 'tui') { await import('../src/tui.ts').then((m) => m.runTui()) }
+else { const { main } = await import('../src/cli.ts'); process.exit(await main()) }

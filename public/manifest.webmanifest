@@ -1,0 +1,10 @@
+{
+  "name": "auto.hacker",
+  "short_name": "auto.hacker",
+  "description": "Authorized, non-destructive website pentests of sites you have proven you own.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#04140e",
+  "theme_color": "#04140e",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}
