@@ -29,4 +29,11 @@ export class Client {
   runs() { return this.req('GET', '/api/v1/runs') }
   run(id: string) { return this.req('GET', `/api/v1/runs/${id}`) }
   stats() { return this.req('GET', '/api/v1/stats') }
+  /** Your webhook endpoints, and the events auto.hacker sends. */
+  webhooks(): Promise<{ endpoints: any[]; event_types: string[] }> { return this.req('GET', '/api/v1/webhooks') }
+  addWebhook(url: string, events?: string[], description = ''): Promise<{ endpoint: any; secret: string }> { return this.req('POST', '/api/v1/webhooks', { url, ...(events?.length ? { events } : {}), description }) }
+  removeWebhook(id: string) { return this.req('DELETE', `/api/v1/webhooks/${encodeURIComponent(id)}`) }
+  testWebhook(id: string): Promise<{ ok: boolean; status: number | null; error: string | null }> { return this.req('POST', `/api/v1/webhooks/${encodeURIComponent(id)}/test`) }
+  rotateWebhook(id: string): Promise<{ secret: string }> { return this.req('POST', `/api/v1/webhooks/${encodeURIComponent(id)}/rotate`) }
+  webhookLog(id?: string): Promise<{ deliveries: any[] }> { return this.req('GET', id ? `/api/v1/webhooks/${encodeURIComponent(id)}/deliveries` : '/api/v1/webhooks/deliveries') }
 }

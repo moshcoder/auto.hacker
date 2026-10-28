@@ -5,6 +5,8 @@ import { pitFooter } from './pit-footer.ts'
 import { RING_PLACEHOLDER } from './ring.ts'
 import type { Run, Target, User, Schedule, Finding } from './db.ts'
 import { VERSION } from './version.ts'
+import type { PublicEndpoint } from '@profullstack/webhooks'
+import { WEBHOOK_EVENTS } from './service.ts'
 
 const ESC: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }
 export const esc = (v: unknown) => String(v ?? '').replace(/[&<>"']/g, (c) => ESC[c]!)
@@ -109,7 +111,7 @@ export function loginPage(ctx: Ctx, opts: { next?: string | null; sent?: boolean
   return layout(ctx, { title: 'Sign in — auto.hacker', desc: 'Sign in to auto.hacker.', body })
 }
 
-export function accountPage(ctx: Ctx, opts: { apiKey?: string; profile?: Record<string, string | null> | null; paid?: boolean }): string {
+export function accountPage(ctx: Ctx, opts: { apiKey?: string; profile?: Record<string, string | null> | null; paid?: boolean; flash?: string; webhooks?: PublicEndpoint[]; webhookSecret?: string }): string {
   const p = opts.profile ?? {}
   const fields = FIELDS.map((f) => `<label>${esc(f.label)}<input type="${f.type}" name="${f.name}" value="${esc(p[f.name] ?? '')}" ${f.name === 'email' ? 'readonly' : ''} placeholder="${esc(f.placeholder ?? '')}" maxlength="${f.maxLength}"></label>`).join('\n')
   const body = `
@@ -125,6 +127,14 @@ export function accountPage(ctx: Ctx, opts: { apiKey?: string; profile?: Record<
     <p class="muted">For the <code>autohacker</code> CLI, the MCP server and the API. Making a new key replaces the old one.</p>
     ${opts.apiKey ? `<pre class="key">${esc(opts.apiKey)}</pre><p class="muted">Copy it now — it is shown once.</p>` : ''}
     <form method="post" action="/account/key"><button class="btn ghost" type="submit">${opts.apiKey ? 'Regenerate' : 'Create'} API key</button></form>
+    <h2 id="webhooks">Webhooks</h2>
+    <p class="muted">auto.hacker POSTs what happens to your targets and scans to your URL: ${WEBHOOK_EVENTS.map((e) => `<code>${esc(e)}</code>`).join(', ')}. CloudEvents JSON, signed per <a href="https://www.standardwebhooks.com/">Standard Webhooks</a> (verify with <code>@profullstack/webhooks</code> or any Standard Webhooks library); retried for about three days. Findings carry severity and title only; the detail stays in the signed-in report.</p>
+    ${opts.flash ? `<p class="ok">${esc(opts.flash)}</p>` : ''}
+    ${opts.webhookSecret ? `<p class="muted">Signing secret:</p><pre class="key">${esc(opts.webhookSecret)}</pre>` : ''}
+    ${(opts.webhooks ?? []).map((w) => `<div class="row"><code>${esc(w.url)}</code> <span class="muted">${esc(w.events.join(', '))}${w.enabled ? '' : ` · off: ${esc(w.disabled_reason ?? 'disabled')}`}</span>
+      ${(['test', 'rotate', 'delete'] as const).map((a) => `<form method="post" action="/account/webhooks/${a}" class="inline"><input type="hidden" name="id" value="${esc(w.id)}"><button class="btn sm ${a === 'test' ? '' : 'ghost'}" type="submit">${a === 'test' ? 'Send a test' : a === 'rotate' ? 'New secret' : 'Remove'}</button></form>`).join('')}</div>`).join('')}
+    <form method="post" action="/account/webhooks/add" class="row"><input name="url" type="url" required placeholder="https://example.com/hooks/autohacker" aria-label="Webhook URL"><input name="events" placeholder="Events (blank = all, or run.*, finding.created)" aria-label="Events"><button class="btn" type="submit">Add webhook</button></form>
+    <p class="muted">Also from the CLI (<code>autohacker webhooks</code>), MCP and <code>/api/v1/webhooks</code>.</p>
     <h2>Scheduled scans</h2>
     <p class="muted">Free scans run on demand against your verified sites. Scheduled, recurring scans with emailed summaries are the paid tier.</p>
     <form method="post" action="/account/checkout"><button class="btn" type="submit">Enable scheduled scans — pay with CoinPay</button></form>

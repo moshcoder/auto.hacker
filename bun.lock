@@ -10,6 +10,7 @@
         "@profullstack/footer": "^0.3.0",
         "@profullstack/hqtui": "^0.10.3",
         "@profullstack/profile": "^0.1.6",
+        "@profullstack/webhooks": "0.2.1",
         "hono": "^4.13.13",
         "zod": "^3.25.0",
       },
@@ -31,6 +32,8 @@
     "@profullstack/hqtui": ["@profullstack/hqtui@0.10.3", "", { "bin": { "hqtui": "bin/hqtui.mjs" } }, "sha512-Z2jaDqmiaGyrMy4JXOoPGCyEkei8l3tHoCbmT3/1gAWDl72ynPvMuHcUj+U97KgsF/CFIpZzzBYnYqcOq5e46g=="],
 
     "@profullstack/profile": ["@profullstack/profile@0.1.6", "", { "peerDependencies": { "@libsql/client": ">=0.6.0", "postgres": "^3.4.0", "react": ">=18" }, "optionalPeers": ["@libsql/client", "postgres", "react"], "bin": { "profile": "src/cli.js" } }, "sha512-xkn0P3ANz151QJdlBwcBXkHk813qW9qAmuTZKcuvpEZYkyHDC9J9KfvpVSRepfjECzz4ONGHWO5Zwc4BHpfK8g=="],
+
+    "@profullstack/webhooks": ["@profullstack/webhooks@0.2.1", "", {}, "sha512-QHeSkpu4O44oJ620qhQqxqFlD3u/OhupmXRnBHw4MGKuDTa0R+Y/727nnF7psSHxxSfnbWfNuVl15z3IXuaZiw=="],
 
     "@types/bun": ["@types/bun@1.4.4", "", { "dependencies": { "bun-types": "1.4.4" } }, "sha512-9wkRDXUXK124pEnAutE6n/l18j+i9GC5IAHK8TmX/2nlySETmky0OU6yL5U8pW1AoKh++AN9auDCr647BfurjQ=="],
 

@@ -8,9 +8,10 @@ import { Hono, type Context } from 'hono'
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie'
 import { streamSSE } from 'hono/streaming'
 import { validateProfile, createProfileStore } from '@profullstack/profile'
+import { webhooksApi, WebhookError } from '@profullstack/webhooks'
 import { Store, type User } from './db.ts'
 import { Auth, consoleMailer, resendMailer, safeNext, SESSION_COOKIE, validEmail, type Mailer } from './auth.ts'
-import { AutoHacker, InputError, type Config } from './service.ts'
+import { AutoHacker, InputError, WEBHOOK_EVENTS, type Config } from './service.ts'
 import { OwnershipError, type Method } from './gate.ts'
 import { Worker } from './worker.ts'
 import { startPitFooterRefresh } from './pit-footer.ts'
@@ -168,7 +169,35 @@ export function createApp(deps: Deps) {
   app.get('/account', async (c) => {
     let u: User; try { u = needUser(c) } catch { return c.redirect('/login?next=/account') }
     const profile = (await profiles.get(u.id)) ?? { email: u.email }
-    return page(c, accountPage(ctxOf(c), { profile: profile as any, paid: c.req.query('paid') === '1' }))
+    return page(c, accountPage(ctxOf(c), { profile: profile as any, paid: c.req.query('paid') === '1', webhooks: await service.hooks.listEndpoints(u.id) }))
+  })
+  // Webhooks from the account page: add, test, rotate, delete. /api/v1/webhooks does the same with a key.
+  app.post('/account/webhooks/:action{(add|test|rotate|delete)}', async (c) => {
+    if (crossSite(c)) return c.text('refused', 403)
+    let u: User; try { u = needUser(c) } catch { return c.redirect('/login?next=/account') }
+    const form = await c.req.parseBody()
+    const show = async (data: { flash?: string; webhookSecret?: string }, status = 200) => {
+      const profile = (await profiles.get(u.id)) ?? { email: u.email }
+      return page(c, accountPage(ctxOf(c), { ...data, profile: profile as any, webhooks: await service.hooks.listEndpoints(u.id) }), status)
+    }
+    if (!postLimit.allow(`wh:${u.id}`)) return show({ flash: 'Too many changes. Wait a few minutes.' }, 429)
+    try {
+      const action = c.req.param('action')
+      if (action === 'add') {
+        const r = await service.hooks.createEndpoint(u.id, { url: String(form.url ?? ''), events: String(form.events ?? '') || undefined, description: String(form.description ?? '') })
+        return show({ flash: 'Webhook added. Its signing secret is below (GET /api/v1/webhooks/:id/secret shows it again).', webhookSecret: r.secret })
+      }
+      const id = String(form.id ?? '')
+      if (action === 'test') {
+        const r = await service.hooks.test(u.id, id)
+        return show({ flash: r.ok ? `Test delivered (HTTP ${r.status}).` : `Test failed: ${r.error}` })
+      }
+      if (action === 'rotate') return show({ flash: 'New signing secret below; the old one has stopped working.', webhookSecret: (await service.hooks.rotateSecret(u.id, id)).secret })
+      await service.hooks.deleteEndpoint(u.id, id)
+      return show({ flash: 'Webhook removed.' })
+    } catch (e) {
+      return show({ flash: (e as Error).message }, e instanceof WebhookError ? e.status : 400)
+    }
   })
   app.post('/account/profile', async (c) => {
     let u: User; try { u = needUser(c) } catch { return c.redirect('/login') }
@@ -225,6 +254,17 @@ export function createApp(deps: Deps) {
   }
   app.get('/api/v1/runs/:id/export.json', (c) => exportRun(c, 'json'))
   app.get('/api/v1/runs/:id/export.csv', (c) => exportRun(c, 'csv'))
+  // Customer webhooks: the @profullstack/webhooks API, scoped to the API key's (or session's) account.
+  const hookOwner = new WeakMap<Request, string>()
+  const hooksApi = webhooksApi(service.hooks, { basePath: '/api/v1/webhooks', owner: (req) => hookOwner.get(req) })
+  const webhooksRoute = async (c: Context) => {
+    const u = api(c); if (!u) return c.json({ error: 'unauthorized' }, 401)
+    if (c.req.method !== 'GET' && !bearer(c) && crossSite(c)) return c.json({ error: 'cross-site request refused' }, 403)
+    hookOwner.set(c.req.raw, u.id)
+    return (await hooksApi(c.req.raw)) ?? c.json({ error: 'not found' }, 404)
+  }
+  app.all('/api/v1/webhooks', webhooksRoute)
+  app.all('/api/v1/webhooks/*', webhooksRoute)
   app.get('/api/v1/stats', (c) => c.json({ ...store.stats(), version: VERSION }))
 
   app.post('/hooks/coinpay', async (c) => {
@@ -263,8 +303,19 @@ GET  /api/v1/runs/:id
 GET  /api/v1/runs/:id/stream         (text/event-stream, live)
 GET  /api/v1/runs/:id/export.json
 GET  /api/v1/runs/:id/export.csv
-GET  /api/v1/stats</pre>
-  <p class="muted">The <code>autohacker</code> CLI and the MCP server speak the same verbs: <code>add</code>, <code>verify</code>, <code>scan</code>, <code>runs</code>, <code>report</code>.</p></article>`
+GET  /api/v1/stats
+
+# customer webhooks (signed CloudEvents, Standard Webhooks)
+GET    /api/v1/webhooks                 -> { endpoints, event_types }
+POST   /api/v1/webhooks                 { "url": "https://…", "events": ["run.*"] }  -> { endpoint, secret }
+PATCH  /api/v1/webhooks/:id             { "url", "events", "description", "enabled" }
+DELETE /api/v1/webhooks/:id
+POST   /api/v1/webhooks/:id/test
+GET    /api/v1/webhooks/:id/secret      -> { secret }
+POST   /api/v1/webhooks/:id/rotate      -> { secret }
+GET    /api/v1/webhooks/:id/deliveries  (or /api/v1/webhooks/deliveries for all)</pre>
+  <p>Events: ${WEBHOOK_EVENTS.map((e) => `<code>${e}</code>`).join(', ')}. <code>finding.created</code> carries the severity and the check's title only, never the probe payload or URL: fetch the run report for detail.</p>
+  <p class="muted">The <code>autohacker</code> CLI and the MCP server speak the same verbs: <code>add</code>, <code>verify</code>, <code>scan</code>, <code>runs</code>, <code>report</code>, <code>webhooks</code>.</p></article>`
   return layout(ctx, { title: 'API — auto.hacker', desc: 'auto.hacker HTTP API.', body, publicPage: true })
 }
 
@@ -290,6 +341,8 @@ export function serve(options: { port?: number; hostname?: string } = {}) {
   setRingFooterOptions(ringFooterOptions([{ label: 'Manifesto', href: '/manifesto' }, { label: 'API', href: '/docs' }, { label: 'ThreatCrush', href: 'https://github.com/profullstack/threatcrush' }]))
   startRingFooterRefresh()
   worker.start()
+  // Customer webhooks: deliveries waiting from before the restart go out now, then every 5 s.
+  service.hooks.start()
   return Bun.serve({ port: options.port ?? Number(env.PORT ?? 8793), hostname: options.hostname ?? env.HOST ?? '127.0.0.1', idleTimeout: 120, maxRequestBodySize: 1024 * 1024, fetch: app.fetch })
 }
 
