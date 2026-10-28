@@ -1,14 +1,21 @@
 {
   "name": "@profullstack/autohacker",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "auto.hacker: authorized, non-destructive website pentest service. Scan only sites you have PROVEN you own (DNS TXT, a /.well-known file, or a meta tag). Powered by the ThreatCrush engine. Web (PWA), API, CLI, TUI and MCP, with realtime SSE run streaming and scheduled email summaries.",
   "license": "MIT",
   "type": "module",
   "homepage": "https://auto.hacker.pit.world",
-  "repository": { "type": "git", "url": "git+https://github.com/moshcoder/auto.hacker.git" },
-  "bin": { "autohacker": "bin/autohacker" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/moshcoder/auto.hacker.git"
+  },
+  "bin": {
+    "autohacker": "bin/autohacker"
+  },
   "files": ["bin/autohacker", "src", "public", "OpenStack.md", "README.md", "LICENSE"],
-  "engines": { "bun": ">=1.1" },
+  "engines": {
+    "bun": ">=1.1"
+  },
   "scripts": {
     "start": "bun src/server.ts",
     "dev": "bun --watch src/server.ts",
@@ -21,8 +28,12 @@
     "@profullstack/footer": "^0.3.0",
     "@profullstack/hqtui": "^0.10.3",
     "@profullstack/profile": "^0.1.6",
+    "@profullstack/webhooks": "0.2.1",
     "hono": "^4.13.13",
     "zod": "^3.25.0"
   },
-  "devDependencies": { "@types/bun": "^1.4.3", "typescript": "^7.0.2" }
+  "devDependencies": {
+    "@types/bun": "^1.4.3",
+    "typescript": "^7.0.2"
+  }
 }

@@ -12,6 +12,14 @@
 import { checkOwnership, normalizeHost, proofInstructions, verifyToken, type GateDeps, type Method, OwnershipError } from './gate.ts'
 import type { Run, Store, Target, User } from './db.ts'
 import { createHmac, timingSafeEqual } from 'node:crypto'
+import { Webhooks, sqliteStore as webhookStore, type GuardOptions } from '@profullstack/webhooks'
+
+/**
+ * What auto.hacker tells customer webhooks about. Finding payloads carry the
+ * severity and the check's title only: never the probe payload, the probed URL or
+ * the raw details (those stay behind the authenticated report).
+ */
+export const WEBHOOK_EVENTS = ['target.verified', 'run.started', 'run.completed', 'run.failed', 'run.refused', 'finding.created']
 
 export class InputError extends Error { constructor(message: string, readonly field?: string) { super(message) } }
 
@@ -24,13 +32,46 @@ export type Config = {
   /** at most one run per host per this many ms */
   runCooldownMs: number
   gate?: GateDeps
+  /** Checks on customer webhook URLs; tests allow private addresses. */
+  webhookGuard?: GuardOptions
+  /** fetch for webhook deliveries (tests inject a receiver). */
+  webhookFetch?: typeof fetch
 }
 
 const SETTLED = new Set(['paid', 'completed', 'confirmed', 'forwarded', 'succeeded', 'settled'])
 const CADENCE_MS: Record<string, number> = { daily: 86_400_000, weekly: 7 * 86_400_000, monthly: 30 * 86_400_000 }
 
 export class AutoHacker {
-  constructor(readonly store: Store, readonly config: Config) {}
+  /** Customer webhooks (@profullstack/webhooks): endpoints per account, durable delivery. */
+  readonly hooks: Webhooks
+
+  constructor(readonly store: Store, readonly config: Config) {
+    this.hooks = new Webhooks({
+      store: webhookStore(store.db as never),
+      source: config.origin,
+      eventTypes: WEBHOOK_EVENTS,
+      ...(config.webhookFetch ? { fetchImpl: config.webhookFetch } : {}),
+      ...(config.webhookGuard ? { guard: config.webhookGuard } : {}),
+      log: (m) => console.log(m),
+    })
+  }
+
+  /** Tell the account's webhooks; never in the way of a scan. */
+  hook(userId: string, type: string, data: Record<string, unknown>, subject: string): void {
+    void this.hooks.emit(userId, type, data, { subject }).catch((e) => console.error(`[webhooks] ${type}: ${(e as Error).message}`))
+  }
+
+  /** Record a live proof; fires target.verified when the host was not verified before. */
+  markVerified(user: User, target: Target, method: Method, token: string): void {
+    const was = this.store.target(target.id)?.state
+    this.store.recordVerified(target, method, token, user.email)
+    if (was !== 'verified') this.hook(user.id, 'target.verified', { target_id: target.id, host: target.host, method }, `target:${target.id}`)
+  }
+
+  /** run.refused: the gate turned a run away (at launch or right before the engine). */
+  hookRefused(run: Run, reason: string): void {
+    this.hook(run.userId, 'run.refused', { run_id: run.id, target_id: run.targetId, host: run.host, trigger: run.trigger, reason, url: `${this.config.origin}/runs/${run.id}` }, `run:${run.id}`)
+  }
 
   /** The exact proof value this user must publish for this host. */
   token(user: User, host: string): string { return verifyToken(this.config.secret, user.id, host) }
@@ -50,7 +91,7 @@ export class AutoHacker {
     if (target.userId !== user.id) throw new InputError('Not your target.')
     const token = this.token(user, target.host)
     const r = await checkOwnership({ host: target.host, token, only }, this.config.gate)
-    if (r.ok && r.method) this.store.recordVerified(target, r.method, token, user.email)
+    if (r.ok && r.method) this.markVerified(user, target, r.method, token)
     else this.store.recordCheckFail(target.id)
     return r
   }
@@ -75,10 +116,11 @@ export class AutoHacker {
       const run = this.store.createRun(target, trigger, 'refused')
       this.store.setRunStatus(run.id, 'refused', { summary: 'Refused: ownership of this host is not proven.', error: `No live proof found. Looked: ${gate.looked.join('; ')}` })
       this.store.recordCheckFail(target.id)
+      this.hookRefused(run, 'ownership is not proven')
       throw new OwnershipError(`auto.hacker will not scan ${target.host}: ownership is not proven. Add the DNS TXT, /.well-known file, or meta tag shown on the target page, then Verify.`)
     }
     // Record the fresh proof (keeps verified state + audit log current) and queue.
-    if (gate.method) this.store.recordVerified(target, gate.method, token, user.email)
+    if (gate.method) this.markVerified(user, target, gate.method, token)
     return this.store.createRun(target, trigger, 'queued')
   }
 

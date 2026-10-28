@@ -9,6 +9,10 @@
  *   autohacker runs                       list recent runs
  *   autohacker report <runId>             print a run's findings
  *   autohacker targets                    list targets and their state
+ *   autohacker webhooks                   your webhook endpoints and the events sent
+ *   autohacker webhook add <url> [events...]  POST scan events to your URL (prints the secret)
+ *   autohacker webhook test|rotate|rm <id>    send a test, replace the secret, or remove it
+ *   autohacker webhook log [id]           recent deliveries
  *
  * Config: AUTOHACKER_URL (default https://auto.hacker.pit.world), AUTOHACKER_API_KEY.
  */
@@ -60,10 +64,25 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
       case 'runs': { const { runs } = await c.runs(); for (const r of runs) console.log(`${r.id}  ${r.status.padEnd(8)}  ${r.host}  ${r.summary ?? ''}`); return 0 }
       case 'report': { const { run, findings } = await c.run(rest[0]!); console.log(`${run.host} — ${run.status} — ${run.summary ?? run.error ?? ''}`); printFindings(findings); return 0 }
       case 'targets': { const { targets } = await c.targets(); for (const t of targets) console.log(`${t.state.padEnd(11)} ${t.host}`); return 0 }
+      case 'webhooks': {
+        const r = await c.webhooks()
+        for (const w of r.endpoints) console.log(`${w.id}  ${w.url}  ${w.events.join(',')}${w.enabled ? '' : `  OFF (${w.disabled_reason})`}`)
+        if (!r.endpoints.length) console.log('no webhooks')
+        console.log(`events: ${r.event_types.join(', ')}`); return 0
+      }
+      case 'webhook': {
+        const [sub, arg, ...more] = rest
+        if (sub === 'add' && arg) { const r = await c.addWebhook(arg, more); console.log(`${r.endpoint.id} -> ${r.endpoint.url}\nsigning secret: ${r.secret}`); return 0 }
+        if (sub === 'test' && arg) { const r = await c.testWebhook(arg); console.log(r.ok ? `delivered (HTTP ${r.status})` : `failed: ${r.error}`); return r.ok ? 0 : 2 }
+        if (sub === 'rotate' && arg) { console.log(`new signing secret: ${(await c.rotateWebhook(arg)).secret}`); return 0 }
+        if ((sub === 'rm' || sub === 'remove' || sub === 'delete') && arg) { await c.removeWebhook(arg); console.log('removed'); return 0 }
+        if (sub === 'log') { const r = await c.webhookLog(arg); for (const d of r.deliveries) console.log(`${String(d.created_at).slice(0, 19)}  ${String(d.event_type).padEnd(16)} ${String(d.status).padEnd(9)} x${d.attempts} ${d.last_status ?? ''} ${d.last_error ?? ''}`); if (!r.deliveries.length) console.log('no deliveries yet'); return 0 }
+        console.error('Usage: autohacker webhook add <url> [events...] | test <id> | rotate <id> | rm <id> | log [id]'); return 1
+      }
       case 'stats': { console.log(JSON.stringify(await c.stats(), null, 2)); return 0 }
       case 'version': case '--version': case '-v': console.log(VERSION); return 0
       default:
-        console.log(`autohacker v${VERSION}\n\nUsage:\n  autohacker add <host>\n  autohacker proof <host>\n  autohacker verify <host> [--method dns|file|meta]\n  autohacker scan <host> [--wait]\n  autohacker runs\n  autohacker report <runId>\n  autohacker targets\n\nEnv: AUTOHACKER_URL, AUTOHACKER_API_KEY (make one on your account page).`)
+        console.log(`autohacker v${VERSION}\n\nUsage:\n  autohacker add <host>\n  autohacker proof <host>\n  autohacker verify <host> [--method dns|file|meta]\n  autohacker scan <host> [--wait]\n  autohacker runs\n  autohacker report <runId>\n  autohacker targets\n  autohacker webhooks\n  autohacker webhook add <url> [events...] | test <id> | rotate <id> | rm <id> | log [id]\n\nEnv: AUTOHACKER_URL, AUTOHACKER_API_KEY (make one on your account page).`)
         return cmd ? 1 : 0
     }
   } catch (e) { console.error((e as Error).message); return 1 }

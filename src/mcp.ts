@@ -32,6 +32,17 @@ export function buildServer(client = new Client()): McpServer {
   server.tool('runs', 'List recent scan runs.', {}, async () => text(await client.runs()))
   server.tool('report', 'Get a run and its findings by id.', { run_id: z.string() }, async ({ run_id }) => text(await client.run(run_id)))
   server.tool('targets', 'List your targets and their verification state.', {}, async () => text(await client.targets()))
+  server.tool('list_webhooks', 'Your webhook endpoints and the event types auto.hacker sends.', {}, async () => text(await client.webhooks()))
+  server.tool(
+    'create_webhook',
+    'Have auto.hacker POST scan events (target.verified, run.started, run.completed, run.failed, run.refused, finding.created) to a URL as signed CloudEvents (Standard Webhooks). Returns the signing secret. events: patterns like "run.*"; omit for all.',
+    { url: z.string().url(), events: z.array(z.string()).optional(), description: z.string().max(200).optional() },
+    async ({ url, events, description }) => text(await client.addWebhook(url, events, description ?? '')),
+  )
+  server.tool('test_webhook', 'Send a webhook.test event to an endpoint now.', { id: z.string() }, async ({ id }) => text(await client.testWebhook(id)))
+  server.tool('rotate_webhook_secret', 'Replace an endpoint\'s signing secret; the old one stops working at once.', { id: z.string() }, async ({ id }) => text(await client.rotateWebhook(id)))
+  server.tool('delete_webhook', 'Remove a webhook endpoint.', { id: z.string() }, async ({ id }) => text(await client.removeWebhook(id)))
+  server.tool('webhook_deliveries', 'Recent webhook deliveries, optionally for one endpoint.', { id: z.string().optional() }, async ({ id }) => text(await client.webhookLog(id)))
   return server
 }
 

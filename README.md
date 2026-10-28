@@ -27,9 +27,18 @@ authorization log row. See [the manifesto](https://auto.hacker.pit.world/manifes
 
 - **Web** (PWA): add target, proof + verify, launch scan, live SSE run stream, history, CSV/JSON export, account/profile.
 - **API**: `GET/POST /api/v1/targets`, `/targets/:id/verify`, `POST /api/v1/runs`, `/runs/:id`, `/runs/:id/stream` (SSE), `/runs/:id/export.{json,csv}`, `GET /api/v1/me/profile` (401 logged out). Bearer `ah_…`.
-- **CLI**: `autohacker add|proof|verify|scan|runs|report|targets`.
-- **MCP**: `autohacker mcp` (add_target, get_proof, verify, scan, runs, report, targets).
+- **CLI**: `autohacker add|proof|verify|scan|runs|report|targets|webhooks|webhook`.
+- **MCP**: `autohacker mcp` (add_target, get_proof, verify, scan, runs, report, targets, list_webhooks, create_webhook, test_webhook, rotate_webhook_secret, delete_webhook, webhook_deliveries).
 - **TUI**: `autohacker tui`.
+
+## Webhooks
+
+Customer webhooks via [`@profullstack/webhooks`](https://github.com/profullstack/webhooks): add a URL on
+`/account#webhooks`, with `autohacker webhook add <url> [events...]`, MCP `create_webhook`, or
+`POST /api/v1/webhooks`. auto.hacker POSTs signed CloudEvents (Standard Webhooks) for `target.verified`,
+`run.started`, `run.completed`, `run.failed`, `run.refused` and `finding.created`, to the account that owns
+the target, retried for about three days. `finding.created` carries severity and the check's title only,
+never the probe payload, probed URL or raw details.
 
 ## Realtime + scheduled
 

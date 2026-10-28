@@ -91,6 +91,8 @@ export class Worker {
 
     this.store.setRunStatus(run.id, 'running')
     this.bus.emit(run.id, { type: 'status', status: 'running', at: Date.now() })
+    const base = { run_id: run.id, target_id: run.targetId, host: run.host, trigger: run.trigger, url: `${this.origin}/runs/${run.id}` }
+    const subject = `run:${run.id}`
 
     // === SECOND GATE WALL: re-check the live proof right before the engine ===
     const token = this.service.token(user, target.host)
@@ -100,24 +102,32 @@ export class Worker {
       this.store.setRunStatus(run.id, 'refused', { summary: 'Refused: ownership lapsed.', error })
       this.store.recordCheckFail(target.id)
       this.bus.emit(run.id, { type: 'refused', error, at: Date.now() })
+      this.service.hookRefused(run, 'ownership lapsed before the scan')
       return
     }
-    if (gate.method) this.store.recordVerified(target, gate.method, token, user.email)
+    if (gate.method) this.service.markVerified(user, target, gate.method, token)
+    this.service.hook(user.id, 'run.started', base, subject)
 
     try {
       const onStep = (note: string) => this.bus.emit(run.id, { type: 'step', note, at: Date.now() })
       const result = await runPentest(target.host, onStep)
       for (const f of result.findings as EngineFinding[]) {
-        this.store.addFinding(run.id, { type: f.type, severity: f.severity, message: f.message, location: f.location, details: f.details ?? null })
+        const saved = this.store.addFinding(run.id, { type: f.type, severity: f.severity, message: f.message, location: f.location, details: f.details ?? null })
+        // Severity + title only: the message/location can name the probe payload.
+        this.service.hook(user.id, 'finding.created', { run_id: run.id, target_id: run.targetId, host: run.host, finding_id: saved.id, severity: f.severity, title: f.type, url: base.url }, subject)
         this.bus.emit(run.id, { type: 'finding', finding: { type: f.type, severity: f.severity, message: f.message, location: f.location }, at: Date.now() })
       }
       this.store.setRunStatus(run.id, 'done', { summary: result.summary, counts: result.severity_summary })
       this.bus.emit(run.id, { type: 'done', summary: result.summary, counts: result.severity_summary, at: Date.now() })
+      // The engine reports an unreachable target as a result with `error`, not a throw.
+      if (result.error) this.service.hook(user.id, 'run.failed', { ...base, error: result.error }, subject)
+      else this.service.hook(user.id, 'run.completed', { ...base, summary: result.summary, counts: result.severity_summary, findings: result.findings.length }, subject)
       await this.emailResult(user.email, this.store.run(run.id)!)
     } catch (e) {
       const error = (e as Error).message
       this.store.setRunStatus(run.id, 'error', { error })
       this.bus.emit(run.id, { type: 'error', error, at: Date.now() })
+      this.service.hook(user.id, 'run.failed', { ...base, error }, subject)
     }
   }
 
