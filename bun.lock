@@ -7,7 +7,7 @@
       "dependencies": {
         "@modelcontextprotocol/sdk": "^1.17.0",
         "@profullstack/coinpay-onboard": "^0.2.0",
-        "@profullstack/footer": "^0.3.0",
+        "@profullstack/footer": "latest",
         "@profullstack/hqtui": "^0.10.3",
         "@profullstack/profile": "^0.1.6",
         "hono": "^4.13.13",
@@ -26,7 +26,7 @@
 
     "@profullstack/coinpay-onboard": ["@profullstack/coinpay-onboard@0.2.0", "", { "dependencies": { "@modelcontextprotocol/sdk": "^1.17.0", "zod": "^3.25.0" }, "bin": { "coinpay-onboard": "bin/coinpay-onboard" } }, "sha512-FxIiTefcAswyCyEapEcC+vSai3IZcOPPxaBGnT7L/VPGfZJYjH1kHoN6DCRMBQx0l2IbJ2aDLqrYUhqRUaI2cA=="],
 
-    "@profullstack/footer": ["@profullstack/footer@0.3.1", "", { "peerDependencies": { "react": ">=18" }, "optionalPeers": ["react"], "bin": { "profullstack-footer": "bin/profullstack-footer.js" } }, "sha512-uiiCgEuOZAFd4UKpOUIhAseVLTXp+tbGF9kosYDuW2M/+/A3QcWtUCu9lYGSNfOUnvnlscqrLjJC2uYZlJmufQ=="],
+    "@profullstack/footer": ["@profullstack/footer@0.6.11", "", { "peerDependencies": { "react": ">=18" }, "optionalPeers": ["react"], "bin": { "profullstack-footer": "bin/profullstack-footer.js" } }, "sha512-9khfQbBM2p5cqMqUg8+K1atF2muYWA0AQaVI6C8gH6Cl+D+7Wc2zeaPmtDMque8HZzA3tdaqoCAAUfsufaL17Q=="],
 
     "@profullstack/hqtui": ["@profullstack/hqtui@0.10.3", "", { "bin": { "hqtui": "bin/hqtui.mjs" } }, "sha512-Z2jaDqmiaGyrMy4JXOoPGCyEkei8l3tHoCbmT3/1gAWDl72ynPvMuHcUj+U97KgsF/CFIpZzzBYnYqcOq5e46g=="],
 

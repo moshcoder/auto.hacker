@@ -18,7 +18,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.17.0",
     "@profullstack/coinpay-onboard": "^0.2.0",
-    "@profullstack/footer": "^0.3.0",
+    "@profullstack/footer": "latest",
     "@profullstack/hqtui": "^0.10.3",
     "@profullstack/profile": "^0.1.6",
     "hono": "^4.13.13",
