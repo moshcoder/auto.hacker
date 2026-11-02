@@ -26,7 +26,7 @@ export const PUBLIC_ORIGIN = 'https://auto.hacker.pit.world'
 
 const CSP = [
   "default-src 'none'", "style-src 'self' 'unsafe-inline'", "script-src 'self' 'unsafe-inline' https://crawlproof.com",
-  "img-src 'self' data:", "connect-src 'self' https://crawlproof.com", "manifest-src 'self'", "worker-src 'self'",
+  "img-src 'self' data: https://built.indie.pit.world https://pwamart.com https://profullstack.com", "connect-src 'self' https://crawlproof.com", "manifest-src 'self'", "worker-src 'self'",
   "form-action 'self' https://coinpayportal.com", "base-uri 'none'", "frame-ancestors 'none'",
 ].join('; ')
 const SECURITY_HEADERS: Record<string, string> = {
