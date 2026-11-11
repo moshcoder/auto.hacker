@@ -39,6 +39,7 @@ ${ctx.selfProof ? `<meta name="autohacker-verify" content="${esc(ctx.selfProof)}
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="stylesheet" href="/style.css">
 ${stats}
+<script type="module" data-webmcp src="https://cdn.jsdelivr.net/npm/@profullstack/webmcp@0/src/embed.js" data-pages="{&quot;manifesto&quot;:&quot;/manifesto&quot;,&quot;api_docs&quot;:&quot;/docs&quot;,&quot;sign_in&quot;:&quot;/login&quot;,&quot;targets&quot;:&quot;/targets&quot;,&quot;runs&quot;:&quot;/runs&quot;,&quot;account&quot;:&quot;/account&quot;}"></script>
 </head>
 <body>
 ${RING_PLACEHOLDER}
@@ -163,8 +164,8 @@ export function targetsPage(ctx: Ctx, targets: Target[], opts: { error?: string;
     <h1>Targets</h1>
     ${opts.error ? `<p class="err">${esc(opts.error)}</p>` : ''}
     ${opts.added ? `<p class="ok">Added <code>${esc(opts.added)}</code>. Now prove you own it.</p>` : ''}
-    <form method="post" action="/targets" class="row">
-      <input type="text" name="host" placeholder="example.com" required autocomplete="off">
+    <form method="post" action="/targets" class="row" toolname="add_target" tooldescription="Add a website you own as a pentest target. You then prove ownership (DNS TXT, /.well-known file or meta tag) before any scan.">
+      <input type="text" name="host" placeholder="example.com" required autocomplete="off" toolparamdescription="Hostname you own, e.g. example.com">
       <button class="btn" type="submit">Add target</button>
     </form>
     <ul class="targets">${rows}</ul>
